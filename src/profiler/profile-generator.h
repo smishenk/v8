@@ -132,19 +132,38 @@ class CodeEntry {
 };
 
 
+struct StackEntry {
+ public:
+  explicit StackEntry(CodeEntry* e = NULL,
+           int line = v8::CpuProfileNode::kNoLineNumberInfo)
+    : entry(e),
+      src_line(line) {}
+
+  CodeEntry* entry;
+  int src_line;
+};
+
+
 class ProfileTree;
 
 class ProfileNode {
  public:
-  inline ProfileNode(ProfileTree* tree, CodeEntry* entry);
+  inline ProfileNode(ProfileTree* tree, CodeEntry* entry,
+                     int src_line = v8::CpuProfileNode::kNoLineNumberInfo);
 
+  ProfileNode* FindChild(StackEntry* stackentry);
+  ProfileNode* FindOrAddChild(StackEntry* stackentry);
+
+  // Supporting old functions
   ProfileNode* FindChild(CodeEntry* entry);
   ProfileNode* FindOrAddChild(CodeEntry* entry);
+
   void IncrementSelfTicks() { ++self_ticks_; }
   void IncreaseSelfTicks(unsigned amount) { self_ticks_ += amount; }
   void IncrementLineTicks(int src_line);
 
   CodeEntry* entry() const { return entry_; }
+  int src_line() const { return src_line_; }
   unsigned self_ticks() const { return self_ticks_; }
   const List<ProfileNode*>* children() const { return &children_list_; }
   unsigned id() const { return id_; }
@@ -166,14 +185,19 @@ class ProfileNode {
   }
 
  private:
-  static uint32_t CodeEntryHash(CodeEntry* entry) { return entry->GetHash(); }
+  static uint32_t StackEntryHash(StackEntry* stack_entry) {
+    return stack_entry->entry->GetHash() ^ ComputeIntegerHash(
+                                               stack_entry->src_line,
+                                               v8::internal::kZeroHashSeed);
+  }
 
   static bool LineTickMatch(void* a, void* b) { return a == b; }
 
   ProfileTree* tree_;
   CodeEntry* entry_;
+  int src_line_;
   unsigned self_ticks_;
-  // Mapping from CodeEntry* to ProfileNode*
+  // Mapping from StackEntry* to ProfileNode*
   HashMap children_;
   List<ProfileNode*> children_list_;
   unsigned id_;
@@ -191,9 +215,12 @@ class ProfileTree {
   ~ProfileTree();
 
   ProfileNode* AddPathFromEnd(
-      const Vector<CodeEntry*>& path,
-      int src_line = v8::CpuProfileNode::kNoLineNumberInfo,
-      bool update_stats = true);
+      const Vector<StackEntry>& path, bool update_stats = true);
+
+  // Support old function
+  ProfileNode* AddPathFromEnd(
+      const Vector<CodeEntry*>& path, bool update_stats = true);
+
   ProfileNode* root() const { return root_; }
   unsigned next_node_id() { return next_node_id_++; }
   unsigned GetFunctionId(const ProfileNode* node);
@@ -225,8 +252,8 @@ class CpuProfile {
   CpuProfile(Isolate* isolate, const char* title, bool record_samples);
 
   // Add pc -> ... -> main() call path to the profile.
-  void AddPath(base::TimeTicks timestamp, const Vector<CodeEntry*>& path,
-               int src_line, bool update_stats);
+  void AddPath(base::TimeTicks timestamp, const Vector<StackEntry>& path,
+               bool update_stats);
   void CalculateTotalTicksAndSamplingRate();
 
   const char* title() const { return title_; }
@@ -334,7 +361,7 @@ class CpuProfilesCollection {
 
   // Called from profile generator thread.
   void AddPathToCurrentProfiles(base::TimeTicks timestamp,
-                                const Vector<CodeEntry*>& path, int src_line,
+                                const Vector<StackEntry>& path,
                                 bool update_stats);
 
   // Limits the number of profiles that can be simultaneously collected.
