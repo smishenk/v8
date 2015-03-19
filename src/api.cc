@@ -8199,6 +8199,11 @@ int CpuProfileNode::GetColumnNumber() const {
       entry()->column_number();
 }
 
+int CpuProfileNode::GetCallSiteLine() const {
+  const i::ProfileNode* node = reinterpret_cast<const i::ProfileNode*>(this);
+  return node->call_site_line();
+}
+
 
 unsigned int CpuProfileNode::GetHitLineCount() const {
   const i::ProfileNode* node = reinterpret_cast<const i::ProfileNode*>(this);

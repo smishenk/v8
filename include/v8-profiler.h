@@ -81,6 +81,12 @@ class V8_EXPORT CpuProfileNode {
   int GetColumnNumber() const;
 
   /**
+   * Returns 1-based source line number of the call site for non-leaf nodes.
+   * For leaf nodes the behavior is undefined.
+  */
+  int GetCallSiteLine() const;
+
+  /**
    * Returns the number of the function's source lines that collect the samples.
    */
   unsigned int GetHitLineCount() const;
